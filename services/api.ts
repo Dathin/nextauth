@@ -2,6 +2,8 @@ import axios, {AxiosError} from 'axios'
 import { parseCookies, setCookie } from 'nookies'
 
 let cookies = parseCookies();
+let isRefreshing = false;
+let failedRequestsQueue = [];
 
 export const api = axios.create({
     baseURL: 'http://localhost:3333',
@@ -16,20 +18,42 @@ api.interceptors.response.use(resposne => resposne, (error: AxiosError) => {
             cookies = parseCookies();
 
             const { 'nextauth.refreshToken': refreshToken } = cookies;
-
-            api.post('/refresh', {
-                refreshToken
-            }).then(response => {
-                const {token} = response.data;
-                setCookie(undefined, 'nextauth.token', token, {
-                    maxAge: 60 * 60 * 24 * 30,
-                    path: '/' // 30 dias
+            const originalConfig = error.config
+            if (!isRefreshing){
+                isRefreshing = true;
+                api.post('/refresh', {
+                    refreshToken
+                }).then(response => {
+                    const {token} = response.data;
+                    setCookie(undefined, 'nextauth.token', token, {
+                        maxAge: 60 * 60 * 24 * 30,
+                        path: '/' // 30 dias
+                    })
+                    setCookie(undefined, 'nextauth.refreshToken', response.data.refreshToken, {
+                        maxAge: 60 * 60 * 24 * 30,
+                        path: '/' // 30 dias
+                    })
+                    api.defaults.headers['Authorization'] = `Bearer ${token}`
+                
+                    failedRequestsQueue.forEach(request => request.resolve(token))
+                }).catch(err => {
+                    failedRequestsQueue.forEach(request => request.reject(err))
+                }).finally(() => {
+                    isRefreshing = false;
+                    failedRequestsQueue = [];
                 })
-                setCookie(undefined, 'nextauth.refreshToken', response.data.refreshToken, {
-                    maxAge: 60 * 60 * 24 * 30,
-                    path: '/' // 30 dias
+            }
+            return new Promise((resolve, reject) => {
+                failedRequestsQueue.push({
+                    resolve: (token: string) => {
+                        originalConfig.headers['Authorization'] = `Bearer ${token}`
+                        
+                        resolve(api(originalConfig))
+                    },
+                    reject: (err: AxiosError) => {
+                        reject(err);
+                    },
                 })
-                api.defaults.headers['Authorization'] = `Bearer ${token}`
             })
         } else {
             //deslogar
