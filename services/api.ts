@@ -1,5 +1,6 @@
 import axios, {AxiosError} from 'axios'
-import { parseCookies, setCookie } from 'nookies'
+import { destroyCookie, parseCookies, setCookie } from 'nookies'
+import Router from 'next/router'
 
 let cookies = parseCookies();
 let isRefreshing = false;
@@ -56,8 +57,13 @@ api.interceptors.response.use(resposne => resposne, (error: AxiosError) => {
                 })
             })
         } else {
-            //deslogar
+            destroyCookie(undefined, 'nextauth.token');
+            destroyCookie(undefined, 'nextauth.refreshToken');
+            
+            Router.push('/')
         }
+
+        return Promise.reject(error);
     }
     console.log(error.response?.status)
 })

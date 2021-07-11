@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import { createContext, ReactNode, useEffect, useState } from "react";
 import Router from 'next/router'
 import { api } from "../services/api";
-import { setCookie, parseCookies } from 'nookies'
+import { setCookie, parseCookies, destroyCookie } from 'nookies'
 
 type User = {
     email: string;
@@ -38,6 +38,12 @@ export function AuthProvider({children}: AuthProviderProps) {
             api.get('/me').then(response => {
                 const {email, permissions, roles} = response.data
                 setUser({email, permissions, roles})
+            })
+            .catch(() => {
+                destroyCookie(undefined, 'nextauth.token');
+                destroyCookie(undefined, 'nextauth.refreshToken');
+                
+                Router.push('/')
             })
         }
     }, [])
