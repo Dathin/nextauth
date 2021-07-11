@@ -3,6 +3,7 @@ import { parseCookies, setCookie } from 'nookies'
 import Router from 'next/router'
 import { signOut } from '../contexts/AuthContext';
 import { GetServerSidePropsContext } from 'next';
+import { AuthTokenError } from '../errors/AuthTokenError';
 
 let isRefreshing = false;
 let failedRequestsQueue = [];
@@ -67,6 +68,8 @@ export function setupApiClient(ctx: GetServerSidePropsContext | undefined = unde
             } else {
                 if(process.browser){
                     signOut()
+                } else {
+                    return Promise.reject(new AuthTokenError())
                 }
             }
     
